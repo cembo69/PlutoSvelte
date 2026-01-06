@@ -17,8 +17,8 @@
   
   // Game Constants
   const PLAYER_SPEED = 8;
-  const BULLET_SPEED = 10;
-  const SHOOT_COOLDOWN = 20;
+  const BULLET_SPEED = 25;
+  const SHOOT_COOLDOWN = 15;
   const QUESTION_TIME = 15; // Zeit pro Frage in Sekunden
 
   // Game Objects
@@ -212,9 +212,11 @@
     const startX = (canvas.width - totalWidth) / 2;
 
     q.a.forEach((answer, i) => {
+      const initialX = startX + i * (blockWidth + gap);
       answerBlocks.push({
-        x: startX + i * (blockWidth + gap),
-        y: 150, // Slightly lower to look "further back" in perspective if horizon is center, or just keep it high. Let's move it down a bit to 150 to be more central-ish but still top.
+        x: initialX,
+        initialX: initialX,
+        y: 300, // Moved down to create more space from question
         width: blockWidth,
         height: blockHeight,
         text: answer,
@@ -351,12 +353,13 @@
       }
     }
 
-    // Update Blocks (No movement anymore)
-    /* 
-    answerBlocks.forEach(block => {
-       // Static blocks
+    // Update Blocks (Movement)
+    const time = Date.now() * 0.002;
+    answerBlocks.forEach((block, i) => {
+       if (!block.active) return;
+       // Gentle sine wave movement
+       block.x = block.initialX + Math.sin(time + i) * 30;
     });
-    */
 
     // Bullet Collisions with Blocks
     bullets.forEach((b, bIndex) => {
@@ -423,9 +426,9 @@
       // Question text is now handled by SplitText component in HTML overlay
       
       // Draw Timer Bar (Vertical on the right)
-      const barWidth = 20;
+      const barWidth = 10;
       const barHeight = 300;
-      const barX = canvas.width - 50;
+      const barX = canvas.width - 40;
       const barY = (canvas.height - barHeight) / 2;
       const pct = Math.max(0, timeLeft / QUESTION_TIME);
       
@@ -434,29 +437,27 @@
       ctx.translate(barX + barWidth + 20, barY + barHeight / 2);
       ctx.rotate(-Math.PI / 2);
       ctx.fillStyle = '#fff';
-      ctx.font = '900 16px "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.font = '700 12px "SF Pro Display", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'center';
+      ctx.letterSpacing = '2px';
       ctx.fillText("ZEIT", 0, 0);
       ctx.restore();
 
       // Background
-      ctx.fillStyle = 'rgba(50, 50, 50, 0.5)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
       ctx.fillRect(barX, barY, barWidth, barHeight);
       
       // Progress (filling from bottom)
       const fillHeight = barHeight * pct;
-      ctx.fillStyle = pct > 0.5 ? '#00ff00' : (pct > 0.2 ? '#ffff00' : '#ff0000');
+      ctx.fillStyle = '#fff';
       
-      // Glow effect for timer
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = ctx.fillStyle;
+      // No Glow, just clean fill
       ctx.fillRect(barX, barY + (barHeight - fillHeight), barWidth, fillHeight);
-      ctx.shadowBlur = 0;
       
       // Border
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(barX, barY, barWidth, barHeight);
+      // ctx.strokeStyle = '#fff';
+      // ctx.lineWidth = 1;
+      // ctx.strokeRect(barX, barY, barWidth, barHeight);
     }
 
     // Update & Render 3D Ship
@@ -496,7 +497,7 @@
       }
     } else if (gameState === 'playing' || gameState === 'feedback') {
       // Fallback 2D Player if 3D not loaded yet
-      ctx.fillStyle = player.color;
+      ctx.fillStyle = '#fff';
       ctx.beginPath();
       ctx.moveTo(player.x + player.width/2, player.y);
       ctx.lineTo(player.x + player.width, player.y + player.height);
@@ -511,9 +512,9 @@
       answerBlocks.forEach(block => {
         if (!block.active) return;
         
-        // Block Body
-        ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
-        ctx.strokeStyle = '#00ffff';
+        // Block Body - Swiss Style: White Border, Transparent Fill
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 2;
         ctx.fillRect(block.x, block.y, block.width, block.height);
         ctx.strokeRect(block.x, block.y, block.width, block.height);
@@ -529,7 +530,7 @@
 
         // Text
         ctx.fillStyle = '#ffffff';
-        ctx.font = '900 14px "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.font = '700 16px "SF Pro Display", "Helvetica Neue", Arial, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(block.text, block.x + block.width/2, block.y + block.height/2);
@@ -539,21 +540,15 @@
     // Draw Bullets
     bullets.forEach(b => {
       ctx.save();
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = '#ffff00';
-      ctx.fillStyle = '#ffff00';
+      // No Glow, just white shape
+      ctx.fillStyle = '#ffffff';
       
-      // Glowing core
+      // Simple circle
       ctx.beginPath();
       ctx.arc(b.x + b.width/2, b.y + b.height/2, b.width, 0, Math.PI * 2);
       ctx.fill();
       
-      // Trail
-      const gradient = ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.height * 2);
-      gradient.addColorStop(0, 'rgba(255, 255, 0, 0.8)');
-      gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(b.x, b.y + b.height/2, b.width, b.height * 2);
+      // No Trail or maybe a very subtle white line
       
       ctx.restore();
     });
@@ -564,15 +559,14 @@
       ctx.globalAlpha = p.life;
       
       if (p.type === 'shockwave') {
-        ctx.strokeStyle = p.color;
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.stroke();
       } else {
-        ctx.fillStyle = p.color;
-        ctx.shadowBlur = 5;
-        ctx.shadowColor = p.color;
+        ctx.fillStyle = '#fff';
+        // No shadow
         ctx.beginPath();
         if (p.type === 'spark') {
            ctx.rect(p.x, p.y, p.size, p.size * 3); // Elongated sparks
@@ -587,8 +581,8 @@
 
     // Draw Feedback Overlay
     if (gameState === 'feedback') {
-      ctx.fillStyle = feedbackColor;
-      ctx.font = '900 60px "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillStyle = '#fff'; // Always white
+      ctx.font = '900 60px "SF Pro Display", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(feedbackText, canvas.width / 2, canvas.height / 2);
     }
@@ -666,7 +660,7 @@
     <div class="lives-container">
       <div class="lives-label">LIVES</div>
       {#each Array(lives) as _}
-        <div class="heart">❤️</div>
+        <div class="life-point"></div>
       {/each}
     </div>
   {/if}
@@ -711,7 +705,8 @@
     height: 100vh;
     background: transparent; /* Changed from #000 to transparent for Galaxy */
     z-index: 9999;
-    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Helvetica', sans-serif;
+    font-weight: 700;
     overflow: hidden;
   }
 
@@ -749,34 +744,40 @@
 
   .hud {
     position: absolute;
-    top: 20px;
-    left: 20px;
-    right: 20px;
+    top: 40px;
+    left: 40px;
+    right: 40px;
     display: flex;
     justify-content: space-between;
-    color: #00ffff;
-    font-size: 24px;
-    font-weight: bold;
-    text-shadow: 0 0 10px #00ffff;
+    color: #fff;
+    font-size: 1.2rem;
+    font-weight: 700;
+    text-shadow: none;
     pointer-events: none;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-family: 'Helvetica', sans-serif;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    padding-bottom: 10px;
   }
 
   .lives-container {
     position: absolute;
-    left: 20px;
+    left: 40px;
     top: 50%;
     transform: translateY(-50%);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 15px;
     pointer-events: none;
     z-index: 10;
   }
 
   .question-container {
     position: absolute;
-    top: 60px;
+    top: 100px;
     left: 0;
     width: 100%;
     display: flex;
@@ -786,27 +787,34 @@
   }
 
   :global(.question-text) {
-    font-size: 32px;
-    font-weight: 900;
+    font-size: 2.5rem;
+    font-weight: 800;
     color: #ffffff;
     text-align: center;
-    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+    text-shadow: none;
+    letter-spacing: -0.02em;
+    max-width: 80%;
+    line-height: 1.2;
   }
 
   .lives-label {
     color: #fff;
-    font-size: 16px;
-    font-weight: 900;
+    font-size: 0.8rem;
+    font-weight: 700;
     writing-mode: vertical-rl;
     text-orientation: mixed;
     transform: rotate(180deg);
     margin-bottom: 10px;
-    letter-spacing: 2px;
+    letter-spacing: 0.2em;
+    opacity: 0.7;
   }
 
-  .heart {
-    font-size: 30px;
-    filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.5));
+  .life-point {
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
   }
 
   .overlay {
@@ -814,59 +822,77 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    text-align: center;
-    background: rgba(0, 20, 40, 0.95);
-    padding: 50px;
-    border: 2px solid #00ffff;
-    border-radius: 20px;
-    box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+    text-align: left;
+    background: transparent;
+    padding: 40px;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
     color: #fff;
-    min-width: 500px;
-    z-index: 100; /* Ensure overlay is above canvases */
+    min-width: auto;
+    width: 100%;
+    max-width: 900px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   h1 {
-    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
-    font-weight: 900;
-    font-size: 48px;
-    margin-bottom: 20px;
-    background: linear-gradient(to right, #00ffff, #ff00ff);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    font-family: 'Helvetica', sans-serif;
+    font-weight: 700;
+    font-size: 5rem;
+    margin: 0 0 1rem 0;
+    background: none;
+    -webkit-text-fill-color: white;
+    color: #fff;
+    letter-spacing: -0.05em;
+    line-height: 0.9;
+    text-transform: uppercase;
+  }
+  
+  .overlay p {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 3rem 0;
+    color: rgba(255, 255, 255, 0.8);
+    max-width: 600px;
+    line-height: 1.4;
   }
 
   .btn {
     background: transparent;
-    border: 2px solid #fff;
+    border: 1px solid #fff;
     color: #fff;
-    padding: 15px 40px;
-    font-size: 20px;
-    font-weight: bold;
+    padding: 1rem 2.5rem;
+    font-size: 1rem;
+    font-weight: 700;
     cursor: pointer;
-    margin: 15px;
-    transition: all 0.2s;
+    margin: 0 1rem 0 0;
+    transition: all 0.3s ease;
     text-transform: uppercase;
-    border-radius: 50px;
+    letter-spacing: 0.1em;
+    border-radius: 0; /* Swiss Style: Sharp corners */
   }
 
   .btn:hover {
     background: #fff;
     color: #000;
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
-    transform: scale(1.05);
+    box-shadow: none;
+    transform: translateY(-2px);
   }
 
   .btn.secondary {
-    border-color: #fff;
-    color: #fff;
-    opacity: 0.7;
+    border-color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.8);
+    opacity: 1;
   }
 
   .btn.secondary:hover {
-    background: #fff;
-    color: #000;
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
-    opacity: 1;
+    border-color: #fff;
+    background: transparent;
+    color: #fff;
+    box-shadow: none;
+    transform: translateY(-2px);
   }
 </style>

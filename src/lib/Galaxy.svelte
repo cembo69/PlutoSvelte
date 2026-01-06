@@ -82,6 +82,29 @@
       return fract(p.x * p.y);
     }
 
+    float noise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      float a = Hash21(i);
+      float b = Hash21(i + vec2(1.0, 0.0));
+      float c = Hash21(i + vec2(0.0, 1.0));
+      float d = Hash21(i + vec2(1.0, 1.0));
+      return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    }
+
+    float fbm(vec2 p) {
+      float v = 0.0;
+      float a = 0.5;
+      mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.5));
+      for (int i = 0; i < 5; i++) {
+        v += a * noise(p);
+        p = rot * p * 2.0 + vec2(100.0);
+        a *= 0.5;
+      }
+      return v;
+    }
+
     float tri(float x) {
       return abs(fract(x) * 2.0 - 1.0);
     }
@@ -188,6 +211,24 @@
 
       vec3 col = vec3(0.0);
 
+      // Nebula Effect
+      float t = uTime * 0.05;
+      vec2 nebulaUV = uv * 0.8; // Scale for nebula
+      float n = fbm(nebulaUV + vec2(t * 0.1, t * 0.05));
+      float n2 = fbm(nebulaUV * 2.0 - vec2(t * 0.15, t * 0.1));
+      
+      // Create a deep, subtle background nebula
+      float nebulaMask = smoothstep(0.2, 0.9, n * n2);
+      vec3 nebulaColor1 = vec3(0.02, 0.0, 0.1); // Very Deep Purple
+      vec3 nebulaColor2 = vec3(0.0, 0.05, 0.15); // Very Deep Blue
+      vec3 nebula = mix(nebulaColor1, nebulaColor2, n2) * nebulaMask * 3.0;
+      
+      // Add some brighter spots (distant galaxies/clusters)
+      float spots = smoothstep(0.7, 1.0, n2) * n;
+      nebula += vec3(0.2, 0.1, 0.3) * spots * 0.5;
+
+      col += nebula;
+
       for (float i = 0.0; i < 1.0; i += 1.0 / NUM_LAYER) {
         float depth = fract(i + uStarSpeed * uSpeed + uScrollOffset * 0.0005);
         float scale = mix(uBaseScale, 0.75, depth);
@@ -199,8 +240,17 @@
         float alpha = length(col);
         alpha = smoothstep(0.0, 0.3, alpha);
         alpha = min(alpha, 1.0);
+        
+        // Vignette for depth
+        float dist = length(vUv - 0.5);
+        float vignette = 1.0 - smoothstep(0.5, 1.5, dist);
+        col *= vignette;
+        
         gl_FragColor = vec4(col, alpha);
       } else {
+        float dist = length(vUv - 0.5);
+        float vignette = 1.0 - smoothstep(0.5, 1.5, dist);
+        col *= vignette;
         gl_FragColor = vec4(col, 1.0);
       }
     }
